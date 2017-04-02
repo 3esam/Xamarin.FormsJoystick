@@ -1,0 +1,33 @@
+## Xamarin stuff
+Components
+[Pp]ackages
+*.userprefs
+Resource.designer.cs
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# NuGet Packages Directory
+packages/
+
+# Windows Store app package directory
+AppPackages/
+
+# Microsoft Fakes
+FakesAssemblies/
+
+*.userprefs
+
+.DS_Store
