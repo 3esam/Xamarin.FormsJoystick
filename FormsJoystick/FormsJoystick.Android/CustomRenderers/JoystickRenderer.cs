@@ -22,6 +22,12 @@ namespace FormsJoystick.Droid.CustomRenderers
     class JoystickRenderer : ViewRenderer<JoystickControl, JoystickMainLayout>
     {
         private JoystickMainLayout _JoystickMainLayout;
+
+        public JoystickRenderer(Context context) : base(context)
+        {
+
+        }
+
         protected override void OnElementChanged(ElementChangedEventArgs<JoystickControl> e)
         {
             base.OnElementChanged(e);

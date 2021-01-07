@@ -1,8 +1,7 @@
 ﻿using CoreGraphics;
 using Foundation;
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics;
 using UIKit;
 
 namespace FormsJoystick.iOS.JoystickiOSCustomControl
@@ -12,6 +11,8 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
         private UIView SquareUIView;
         private UIView StickUIView;
         private readonly double stickUIViewSize = 40;
+        private double SquareUIViewSize = 80;
+        private UITouch _thisTouch;
 
         private nfloat _xInView;
         private nfloat _yInView;
@@ -23,6 +24,7 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
         private Action<int, int, double, double> _updateValues;
 
         private bool _dragable;
+        private string _name;
 
         public int Xposition { get; private set; }
         public int Yposition { get; private set; }
@@ -32,52 +34,99 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
         public override void Draw(CGRect rect)
         {
             base.Draw(rect);
+            _name = Guid.NewGuid().ToString().Substring(0, 5); //helps with debugging
+            //Debug.Write($"NAME =-= {_name}");
 
-            var squareUIViewSize = rect.Height > rect.Width ? rect.Width : rect.Height;
+            var squareUiViewSize = rect.Height > rect.Width ? rect.Width : rect.Height;
+            SquareUIViewSize = squareUiViewSize;
             //Odd sized square makes some wrong calculations, still don't know why :/
-            if (squareUIViewSize % 2 != 0) squareUIViewSize--;
+            if (squareUiViewSize % 2 != 0) squareUiViewSize--;
 
             SquareUIView = new UIView();
             AddSubview(SquareUIView);
-            SquareUIView.Frame = new CGRect(Frame.Width / 2 - squareUIViewSize / 2, Frame.Height / 2 - squareUIViewSize / 2, squareUIViewSize, squareUIViewSize);
+            SquareUIView.Frame = new CGRect(Frame.Width / 2 - squareUiViewSize / 2, Frame.Height / 2 - squareUiViewSize / 2, squareUiViewSize, squareUiViewSize);
+            SquareUIView.MultipleTouchEnabled = true;
             //SquareUIView.BackgroundColor = UIColor.White;
 
-            var squareUIViewBackgroundImage = new UIImageView(UIImage.FromBundle("pad.png"));
-            squareUIViewBackgroundImage.Frame = new CGRect(0, 0, squareUIViewSize, squareUIViewSize);
-            SquareUIView.AddSubview(squareUIViewBackgroundImage);
+            var squareUiViewBackgroundImage = new UIImageView(UIImage.FromBundle("pad.png"));
+            squareUiViewBackgroundImage.Frame = new CGRect(0, 0, squareUiViewSize, squareUiViewSize);
+            SquareUIView.AddSubview(squareUiViewBackgroundImage);
 
             StickUIView = new UIView();
             SquareUIView.AddSubview(StickUIView);
-            StickUIView.Frame = new CGRect(squareUIViewSize / 2 - stickUIViewSize / 2, squareUIViewSize / 2 - stickUIViewSize / 2, stickUIViewSize, stickUIViewSize);
+            StickUIView.Frame = new CGRect(squareUiViewSize / 2 - stickUIViewSize / 2, squareUiViewSize / 2 - stickUIViewSize / 2, stickUIViewSize, stickUIViewSize);
 
-            var stickUIViewBackgroundImage = new UIImageView(UIImage.FromBundle("stick.png"));
-            stickUIViewBackgroundImage.Frame = new CGRect(0, 0, stickUIViewSize, stickUIViewSize);
-            StickUIView.AddSubview(stickUIViewBackgroundImage);
+            var stickUiViewBackgroundImage = new UIImageView(UIImage.FromBundle("stick.png"));
+            stickUiViewBackgroundImage.Frame = new CGRect(0, 0, stickUIViewSize, stickUIViewSize);
+            StickUIView.AddSubview(stickUiViewBackgroundImage);
+
+            //Set initial X and Y position for the stick location.                    
+            _originalX = StickUIView.Frame.Left;
+            _originalY = StickUIView.Frame.Top;
         }
 
         public override void TouchesBegan(NSSet touches, UIEvent evt)
         {
+
             base.TouchesBegan(touches, evt);
-            UITouch touch = (UITouch)evt.AllTouches.AnyObject;
 
-            //get touch location relative to StickView
-            CGPoint locationInStickView = touch.LocationInView(StickUIView);
+            //Debug.Write($"TB NAME =-= {_name}");
+            bool foundTouch = false;
 
-            //return if touch location out of StickView bounds
-            if (locationInStickView.X > stickUIViewSize || locationInStickView.X < 0 ||
-                locationInStickView.Y > stickUIViewSize || locationInStickView.Y < 0)
+            CGPoint locationInSquareView;
+
+            if (evt?.AllTouches == null || evt.AllTouches.Count == 0)
             {
-                _dragable = false;
+                Debug.Write("All touches was 0 Returning");
+                return;
+            }
+
+            if (evt.AllTouches.Count == 1)
+            {
+                _thisTouch = (UITouch)evt.AllTouches.AnyObject;
+            }
+            else
+            {
+                //Find this touch.
+                //int cnt = -1;
+                foreach (var o in evt.AllTouches)
+                {
+                    //cnt++;
+                    var t = (UITouch)o;
+                    //Change by Amit - Using SquareUIView to give a little more "room" to find the right one using smaller controls
+                    locationInSquareView = t.LocationInView(SquareUIView);
+                    if (locationInSquareView.X > SquareUIViewSize || locationInSquareView.X < 0 || locationInSquareView.Y > SquareUIViewSize || locationInSquareView.Y < 0)
+                    {
+                        //Debug.Write($"this is not my touch: {cnt} ({locationInStickView.X},{locationInStickView.Y})");
+                        continue;
+                    }
+
+                    //Debug.Write($"FOUND my touch: {cnt} ({locationInStickView.X},{locationInStickView.Y})");
+                    _thisTouch = t; //this is my touch!
+                    foundTouch = true;
+                    break;
+                }
+
+                if (!foundTouch)
+                {
+                    //Debug.Write("Could not find this touch... returning");
+                    return;
+                }
+            }
+
+            //get touch location relative to SquareView
+            //This is an extra check, but for some reason sometimes it does fall into this... Not sure why
+            locationInSquareView = _thisTouch.LocationInView(SquareUIView);
+            if (locationInSquareView.X > SquareUIViewSize || locationInSquareView.X < 0 || locationInSquareView.Y > SquareUIViewSize || locationInSquareView.Y < 0)
+            {
+                //Debug.Write($"Even after finding - location not in square, return! ({locationInStickView.X},{locationInStickView.Y})");
                 return;
             }
 
             _dragable = true;
 
-            //Set initial X and Y position for the stick location.                    
-            _originalX = StickUIView.Frame.Left;
-            _originalY = StickUIView.Frame.Top;
-
             //Set initial X and Y position relative to self                        
+            var locationInStickView = _thisTouch.LocationInView(StickUIView);
             _xInView = locationInStickView.X;
             _yInView = locationInStickView.Y;
         }
@@ -88,10 +137,14 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
             if (!_dragable)
                 return;
 
-            UITouch touch = (UITouch)evt.AllTouches.AnyObject;
+            if (_thisTouch == null)
+            {
+                //Debug.Write("_thisTouch was null no drag for you!");
+                return;
+            }
 
             //Get touch position relative to SquareUIView            
-            CGPoint touchLocation = touch.LocationInView(SquareUIView);
+            CGPoint touchLocation = _thisTouch.LocationInView(SquareUIView);
 
             //Calculate the future position of the stick
             nfloat newLeft = touchLocation.X - _xInView;
@@ -119,6 +172,7 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
 
                 //calculate the X and Y from maximum distance and "future angle".
                 newXAxis = (int)(Math.Sin(angle * (Math.PI / 180)) * maxDistance);
+
                 //Multiply by -1 to Convert future position back from (axis positioning) to (screen positioning).
                 newYAxis = (int)((Math.Cos(angle * (Math.PI / 180)) * maxDistance) * -1);
 
@@ -135,6 +189,8 @@ namespace FormsJoystick.iOS.JoystickiOSCustomControl
         public override void TouchesEnded(NSSet touches, UIEvent evt)
         {
             base.TouchesEnded(touches, evt);
+            _thisTouch = null;
+
 
             if (!_dragable)
                 return;
